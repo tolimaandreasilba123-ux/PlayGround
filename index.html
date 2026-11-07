@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#090b0d" />
+  <link rel="icon" href="data:," />
+  <title>Hollowmere — The Ashen Reach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="game-shell">
+    <canvas id="world"></canvas>
+    <div class="vignette"></div>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><div><strong>HOLLOWMERE</strong><small>THE ASHEN REACH</small></div></div>
+      <div class="location"><span class="location-dot"></span><span id="region-name">Las tierras de la ceniza</span></div>
+      <button class="icon-button" id="sound-toggle" aria-label="Sonido">♫</button>
+    </header>
+    <section class="quest-card">
+      <div class="eyebrow">JURAMENTO DE CENIZA <span>01</span></div>
+      <h1>La última<br>brasa</h1>
+      <p>Sigue las luces hasta el santuario.<br>Despierta la llama dormida.</p>
+      <div class="quest-progress"><i></i><span id="quest-state">ENCUENTRA EL SANTUARIO</span></div>
+    </section>
+    <section class="status-panel">
+      <div class="status-head"><span>VIAJERO</span><span id="level-label">NIVEL 01</span></div>
+      <div class="stat-row"><span class="stat-icon hp">✦</span><div class="stat-track"><div class="stat-fill health-fill" id="health-fill"></div><small>VITALIDAD</small></div><b id="health-text">100</b></div>
+      <div class="stat-row"><span class="stat-icon stamina-icon">◈</span><div class="stat-track"><div class="stat-fill stamina-fill" id="stamina-fill"></div><small>RESISTENCIA</small></div><b id="stamina-text">100</b></div>
+      <div class="souls"><span>ESENCIA</span><strong id="souls-count">0</strong><span class="soul-gem">◆</span></div>
+    </section>
+    <div class="compass"><span class="compass-n">N</span><span class="compass-line"></span><span class="compass-label" id="compass-label">— EL UMBRAL —</span></div>
+    <div class="prompt" id="interact-prompt">[ E ]  ENCENDER SANTUARIO</div>
+    <div class="toast" id="toast"></div>
+    <div class="boss-bar" id="boss-bar"><div class="boss-title"><span>☠</span> EL CABALLERO HUECO</div><div class="boss-track"><i id="boss-fill"></i></div></div>
+    <div class="bottom-ui">
+      <div class="quick-slot"><span class="slot-key">R</span><span class="flask">♜</span><span class="slot-count" id="flask-count">3</span></div>
+      <div class="controls-hint"><span>W A S D</span> MOVER <i>·</i> <span>RATÓN</span> MIRAR <i>·</i> <span>CLIC</span> ATACAR <i>·</i> <span>ESPACIO</span> RODAR <i>·</i> <span>E</span> INTERACTUAR</div>
+      <div class="weapon"><span class="weapon-icon">⚔</span><div><b>ESPADA DE LOS CAÍDOS</b><small>ARMA · HIERRO VIEJO</small></div><span class="weapon-badge">I</span></div>
+    </div>
+    <div class="mobile-controls" aria-label="Controles táctiles">
+      <div class="move-pad"><button data-move="forward">▲</button><div><button data-move="left">◀</button><button data-move="back">▼</button><button data-move="right">▶</button></div></div>
+      <div class="action-pad"><button data-action="dodge">RODAR</button><button data-action="attack">ATACAR</button><button data-action="heal">FRASCO</button></div>
+    </div>
+    <div id="start-screen" class="start-screen">
+      <div class="start-content"><div class="start-sigil">✦</div><p class="start-kicker">UN REINO QUE OLVIDÓ EL AMANECER</p><h2>HOLLOW<span>MERE</span></h2><p class="start-copy">La llama se apaga. Los muertos recuerdan.<br>Camina hacia la oscuridad y reclama lo que queda.</p><button id="begin-button">ENTRAR EN LAS TIERRAS <span>→</span></button><small>MEJOR JUGADO CON TECLADO Y RATÓN</small></div>
+      <div class="start-footer">UNA AVENTURA EN LAS TIERRAS DE LA CENIZA <span>·</span> 01 / 01</div>
+    </div>
+    <div id="death-screen" class="modal-screen hidden"><p>LA LLAMA SE HA EXTINGUIDO</p><h2>HAS CAÍDO</h2><button id="retry-button">VOLVER AL SANTUARIO</button></div>
+    <div id="victory-screen" class="modal-screen hidden"><p>EL CICLO SE HA ROTO</p><h2>LA ÚLTIMA BRASA</h2><button id="continue-button">SEGUIR EXPLORANDO</button></div>
+    <div class="loading" id="loading">CARGANDO LAS TIERRAS <span>✦</span></div>
+  </main>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
