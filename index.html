@@ -9,11 +9,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
   <main id="game-shell">
     <canvas id="world"></canvas>
     <div class="vignette"></div>
+    <div class="grain"></div>
+    <div class="hurt" id="hurt"></div>
+    <div class="reticle" id="reticle"></div>
     <header class="topbar">
       <div class="brand"><span class="brand-mark">✦</span><div><strong>HOLLOWMERE</strong><small>THE ASHEN REACH</small></div></div>
       <div class="location"><span class="location-dot"></span><span id="region-name">Las tierras de la ceniza</span></div>
@@ -37,7 +48,7 @@
     <div class="boss-bar" id="boss-bar"><div class="boss-title"><span>☠</span> EL CABALLERO HUECO</div><div class="boss-track"><i id="boss-fill"></i></div></div>
     <div class="bottom-ui">
       <div class="quick-slot"><span class="slot-key">R</span><span class="flask">♜</span><span class="slot-count" id="flask-count">3</span></div>
-      <div class="controls-hint"><span>W A S D</span> MOVER <i>·</i> <span>RATÓN</span> MIRAR <i>·</i> <span>CLIC</span> ATACAR <i>·</i> <span>ESPACIO</span> RODAR <i>·</i> <span>E</span> INTERACTUAR</div>
+      <div class="controls-hint"><span>W A S D</span> MOVER <i>·</i> <span>MAYÚS</span> CORRER <i>·</i> <span>RATÓN</span> MIRAR <i>·</i> <span>CLIC</span> ATACAR <i>·</i> <span>ESPACIO</span> RODAR <i>·</i> <span>E</span> INTERACTUAR</div>
       <div class="weapon"><span class="weapon-icon">⚔</span><div><b>ESPADA DE LOS CAÍDOS</b><small>ARMA · HIERRO VIEJO</small></div><span class="weapon-badge">I</span></div>
     </div>
     <div class="mobile-controls" aria-label="Controles táctiles">

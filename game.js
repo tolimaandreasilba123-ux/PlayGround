@@ -1,47 +1,85 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('world');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x59645f);
-scene.fog = new THREE.FogExp2(0x59645f, 0.0095);
-const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 260);
+scene.background = new THREE.Color(0x81908e);
+scene.fog = new THREE.FogExp2(0x81908e, 0.0072);
+const camera = new THREE.PerspectiveCamera(54, innerWidth / innerHeight, 0.1, 260);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.65));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
-scene.add(new THREE.HemisphereLight(0xb9c2b9, 0x242624, 1.3));
-const sun = new THREE.DirectionalLight(0xffdfb0, 2.2);
+renderer.toneMappingExposure = 1.16;
+renderer.physicallyCorrectLights = true;
+scene.add(new THREE.HemisphereLight(0xc8d1d0, 0x35312b, 1.05));
+const sun = new THREE.DirectionalLight(0xffd5a0, 3.2);
 sun.position.set(-38, 55, -22); sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -48; sun.shadow.camera.right = 48; sun.shadow.camera.top = 48; sun.shadow.camera.bottom = -48;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -38; sun.shadow.camera.right = 38; sun.shadow.camera.top = 38; sun.shadow.camera.bottom = -38;
+sun.shadow.bias = -0.00015; sun.shadow.normalBias = 0.025; sun.shadow.radius = 3;
 scene.add(sun);
-const fill = new THREE.DirectionalLight(0x8b9b9e, 0.7); fill.position.set(45, 20, 32); scene.add(fill);
+const fill = new THREE.DirectionalLight(0x9caeb2, 1.2); fill.position.set(45, 20, 32); scene.add(fill);
 const clock = new THREE.Clock();
 const WORLD = 180, keys = {}, touchKeys = {};
-const state = { started:false, dead:false, won:false, health:100, stamina:100, essence:0, flasks:3, shrine:false, attack:0, attackHit:false, dodge:0, heal:0, yaw:0, pitch:0.18, moving:false, toastTimer:0, respawn:{x:0,z:13}, bossNear:false };
+const state = { started:false, dead:false, won:false, health:100, stamina:100, essence:0, flasks:3, shrine:false, attack:0, attackHit:false, dodge:0, heal:0, yaw:0, pitch:0.18, moving:false, sprinting:false, hurt:0, toastTimer:0, respawn:{x:0,z:13}, bossNear:false };
+function makeSurfaceMaps(base, scale=256, detail=700){
+ const colorCanvas=document.createElement('canvas'), bumpCanvas=document.createElement('canvas');
+ colorCanvas.width=colorCanvas.height=bumpCanvas.width=bumpCanvas.height=scale;
+ const c=colorCanvas.getContext('2d'), b=bumpCanvas.getContext('2d');
+ c.fillStyle=base;c.fillRect(0,0,scale,scale);b.fillStyle='#888';b.fillRect(0,0,scale,scale);
+ let seed=base.split('').reduce((n,ch)=>n+ch.charCodeAt(0),11);const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+ for(let i=0;i<detail;i++){
+  const x=rand()*scale,y=rand()*scale,r=.5+rand()*3.8,v=Math.floor(rand()*70);
+  c.fillStyle=`rgba(${rand()>.5?220:12},${rand()>.5?205:17},${rand()>.5?180:15},${.025+rand()*.1})`;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();
+  const h=Math.floor(80+rand()*100);b.fillStyle=`rgb(${h},${h},${h})`;b.beginPath();b.arc(x,y,r*1.25,0,Math.PI*2);b.fill();
+ }
+ const color=new THREE.CanvasTexture(colorCanvas), bump=new THREE.CanvasTexture(bumpCanvas);
+ color.colorSpace=THREE.SRGBColorSpace;color.wrapS=color.wrapT=bump.wrapS=bump.wrapT=THREE.RepeatWrapping;
+ color.anisotropy=bump.anisotropy=4;return {color,bump};
+}
+const groundMaps=makeSurfaceMaps('#55544a',256,1300), stoneMaps=makeSurfaceMaps('#77766d',256,950), barkMaps=makeSurfaceMaps('#433b32',256,700), clothMaps=makeSurfaceMaps('#555451',256,900);
+groundMaps.color.repeat.set(18,18);groundMaps.bump.repeat.set(18,18);
+stoneMaps.color.repeat.set(2,2);stoneMaps.bump.repeat.set(2,2);
+barkMaps.color.repeat.set(1,3);barkMaps.bump.repeat.set(1,3);
+clothMaps.color.repeat.set(2,2);clothMaps.bump.repeat.set(2,2);
 const mats = {
- ground:new THREE.MeshStandardMaterial({color:0x43483f,roughness:1}), darkGround:new THREE.MeshStandardMaterial({color:0x303731,roughness:1}), stone:new THREE.MeshStandardMaterial({color:0x555650,roughness:1}), stoneDark:new THREE.MeshStandardMaterial({color:0x363a37,roughness:1}), wood:new THREE.MeshStandardMaterial({color:0x37362f,roughness:1}), bark:new THREE.MeshStandardMaterial({color:0x302d28,roughness:1}), cloth:new THREE.MeshStandardMaterial({color:0x393d3b,roughness:.95}), armor:new THREE.MeshStandardMaterial({color:0x555852,metalness:.65,roughness:.48}), rust:new THREE.MeshStandardMaterial({color:0x69443a,metalness:.45,roughness:.7}), bone:new THREE.MeshStandardMaterial({color:0xaaa18b,roughness:.8}), gold:new THREE.MeshStandardMaterial({color:0xb89c67,metalness:.5,roughness:.45}), glow:new THREE.MeshBasicMaterial({color:0xffb95e})
+ ground:new THREE.MeshStandardMaterial({color:0xaaa69a,map:groundMaps.color,bumpMap:groundMaps.bump,bumpScale:.22,roughness:1}), darkGround:new THREE.MeshStandardMaterial({color:0x55554e,roughness:1}), stone:new THREE.MeshStandardMaterial({color:0xaaa99f,map:stoneMaps.color,bumpMap:stoneMaps.bump,bumpScale:.12,roughness:.93}), stoneDark:new THREE.MeshStandardMaterial({color:0x65665f,map:stoneMaps.color,bumpMap:stoneMaps.bump,bumpScale:.15,roughness:.98}), wood:new THREE.MeshStandardMaterial({color:0x62584a,map:barkMaps.color,bumpMap:barkMaps.bump,bumpScale:.09,roughness:.95}), bark:new THREE.MeshStandardMaterial({color:0x51463b,map:barkMaps.color,bumpMap:barkMaps.bump,bumpScale:.17,roughness:1}), cloth:new THREE.MeshStandardMaterial({color:0x73716a,map:clothMaps.color,bumpMap:clothMaps.bump,bumpScale:.09,roughness:.96}), armor:new THREE.MeshStandardMaterial({color:0x85877f,metalness:.72,roughness:.36}), rust:new THREE.MeshStandardMaterial({color:0x75483a,metalness:.65,roughness:.48}), bone:new THREE.MeshStandardMaterial({color:0xaaa18b,roughness:.8}), gold:new THREE.MeshStandardMaterial({color:0xb89c67,metalness:.72,roughness:.3}), glow:new THREE.MeshBasicMaterial({color:0xffb95e})
 };
 const groundY = (x,z) => 0.25*Math.sin(x*.09)+0.22*Math.cos(z*.105)+0.12*Math.sin((x+z)*.17) + 0.035*Math.sin(x*.43)*Math.cos(z*.35);
 function addMesh(geo, mat, parent=scene, x=0,y=0,z=0, sx=1,sy=1,sz=1, rot=0){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.rotation.y=rot;m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+function makeSky(){
+ const canvas=document.createElement('canvas');canvas.width=2;canvas.height=256;const ctx=canvas.getContext('2d');
+ const gradient=ctx.createLinearGradient(0,0,0,256);gradient.addColorStop(0,'#263941');gradient.addColorStop(.52,'#657978');gradient.addColorStop(.77,'#aaa08a');gradient.addColorStop(1,'#c7a984');ctx.fillStyle=gradient;ctx.fillRect(0,0,2,256);
+ const sky=new THREE.Mesh(new THREE.SphereGeometry(230,32,20),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(canvas),side:THREE.BackSide,depthWrite:false}));scene.add(sky);
+}
+makeSky();
 function makeTerrain(){
- const size=220, seg=120, geo=new THREE.PlaneGeometry(size,size,seg,seg);geo.rotateX(-Math.PI/2);
+ const size=220, seg=150, geo=new THREE.PlaneGeometry(size,size,seg,seg);geo.rotateX(-Math.PI/2);
  const p=geo.attributes.position; for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);p.setY(i,groundY(x,z));} geo.computeVertexNormals();
  const ground=new THREE.Mesh(geo,mats.ground);ground.receiveShadow=true;scene.add(ground);
- // worn dark trail winding between the spawn and the distant shrine
- const points=[]; for(let i=0;i<=36;i++){const z=22-i*3.1;const x=Math.sin(i*.19)*7;points.push(new THREE.Vector3(x,groundY(x,z)+.04,z));}
- const trailGeo=new THREE.BufferGeometry().setFromPoints(points);const trail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),120,2.4,6,false),mats.darkGround);trail.scale.y=.035;trail.position.y=-.02;scene.add(trail);
- // broken track stones
- for(let i=0;i<30;i++){const z=16-i*2.7,x=Math.sin(i*.19)*7+(Math.random()-.5)*2;const rock=addMesh(new THREE.DodecahedronGeometry(.55+Math.random()*.5,0),i%3?mats.stoneDark:mats.stone,scene,x,groundY(x,z)+.1,z,.9,.28,.7,Math.random()*3);rock.castShadow=false;}
+ // Soft-edged, worn dirt track following the pilgrims' route.
+ const points=[]; for(let i=0;i<=36;i++){const z=22-i*3.1;const x=Math.sin(i*.19)*7;points.push(new THREE.Vector3(x,groundY(x,z)+.035,z));}
+ const trailGeo=new THREE.BufferGeometry().setFromPoints(points);const trail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),160,2.35,8,false),mats.darkGround);trail.scale.y=.015;trail.position.y=-.005;trail.receiveShadow=true;scene.add(trail);
+ for(let i=0;i<38;i++){const z=16-i*2.55,x=Math.sin(i*.19)*7+(Math.random()-.5)*2.8;const rock=addMesh(new THREE.DodecahedronGeometry(.35+Math.random()*.55,1),i%3?mats.stoneDark:mats.stone,scene,x,groundY(x,z)+.06,z,.9,.22,.72,Math.random()*3);rock.castShadow=false;}
 }
 function makeTree(x,z,s=1){
- const y=groundY(x,z),g=new THREE.Group();g.position.set(x,y,z);scene.add(g);
- addMesh(new THREE.CylinderGeometry(.13*s,.3*s,3.8*s,6),mats.bark,g,0,1.8*s,0,1,1,1,(Math.random()-.5)*.24);
- for(let i=0;i<3;i++){const h=(2.7+i*.55)*s;const branch=addMesh(new THREE.CylinderGeometry(.045*s,.13*s,2.3*s,5),mats.bark,g,(i%2?-.6:.65)*s,h,0,1,1,1,(i%2?-.7:.7));branch.rotation.z=(i%2?-.7:.7);}
- for(let i=0;i<5;i++){const a=i*1.25, radius=(.5+Math.random()*.6)*s;addMesh(new THREE.ConeGeometry(.45*s,.9*s,5),i%2?mats.darkGround:mats.wood,g,Math.cos(a)*radius,(3.4+Math.random()*1.4)*s,Math.sin(a)*radius,1,1,1,a);}
+ const y=groundY(x,z),g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=Math.random()*Math.PI*2;scene.add(g);
+ const stem=(a,b,r1,r2)=>{const dir=new THREE.Vector3().subVectors(b,a),mesh=addMesh(new THREE.CylinderGeometry(r2,r1,dir.length(),7),mats.bark,g,(a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());return mesh;};
+ stem(new THREE.Vector3(0,0,0),new THREE.Vector3(.08*s,4.7*s,0),.34*s,.055*s);
+ for(let level=0;level<3;level++){
+  const h=(1.65+level*.9)*s;
+  for(let j=0;j<2;j++){
+   const a=j*Math.PI+level*1.35+(Math.random()-.5)*.35,len=(1.35+Math.random()*.65)*s;
+   const start=new THREE.Vector3(.02*s,h,0),end=new THREE.Vector3(Math.cos(a)*len,(h+.6*s+Math.random()*.3*s),Math.sin(a)*len);
+   stem(start,end,.14*s,.035*s);
+   if(level===2){const twigEnd=end.clone().add(new THREE.Vector3(Math.cos(a+.6)*.52*s,.55*s,Math.sin(a+.6)*.52*s));stem(end,twigEnd,.05*s,.012*s);}
+  }
+ }
+ // exposed roots anchor the dead trunk into the uneven soil
+ for(let j=0;j<3;j++){const a=j*Math.PI*2/3;stem(new THREE.Vector3(0,.15*s,0),new THREE.Vector3(Math.cos(a)*.78*s,.015,Math.sin(a)*.78*s),.16*s,.055*s);}
 }
 function makeRock(x,z,s){const m=addMesh(new THREE.DodecahedronGeometry(s,1),Math.random()>.5?mats.stone:mats.stoneDark,scene,x,groundY(x,z)+s*.45,z,1.25,.78,.9,Math.random()*3);m.castShadow=true;}
 function makeRuin(x,z,s=1){
@@ -120,14 +158,14 @@ function interact(){
 function attack(){if(!state.started||state.dead||state.won||state.attack>0||state.dodge>0||state.stamina<17)return;state.attack=.48;state.attackHit=false;state.stamina-=17;playTone(130,.13,'sawtooth',.045);}
 function dodge(){if(!state.started||state.dead||state.won||state.dodge>0||state.stamina<27)return;state.dodge=.43;state.stamina-=27;playTone(95,.16,'triangle',.04);}
 function heal(){if(state.dead||state.won)return;if(state.flasks<1||state.health>=100){showToast(state.flasks<1?'NO QUEDAN FRASCOS':'YA ESTÁS EN PLENAS FUERZAS');return;}state.flasks--;state.health=Math.min(100,state.health+42);state.heal=.5;playTone(520,.4,'sine',.05);showToast('LA ESENCIA CIERRA TUS HERIDAS');updateHud();}
-function damageHero(amount){if(state.dodge>0||state.dead)return;state.health=Math.max(0,state.health-amount);hero.hitFlash=.22;playTone(68,.2,'sawtooth',.07);updateHud();if(state.health<=0){state.dead=true;$('death-screen').classList.remove('hidden');document.exitPointerLock?.();}}
-function damageEnemy(e,amount){if(!e.alive)return;e.hp=Math.max(0,e.hp-amount);e.hitFlash=.2;playTone(e.isBoss?90:115,.12,'square',.04);if(e.hp<=0){e.alive=false;scene.remove(e.root);state.essence+=e.isBoss?120:35;updateHud();showToast(e.isBoss?'EL CABALLERO HUECO HA CAÍDO':'EL ESPÍRITU SE DISUELVE');if(e.isBoss){state.won=true;$('victory-screen').classList.remove('hidden');document.exitPointerLock?.();}else if(enemies.filter(x=>!x.isBoss&&x.alive).length===0){$('quest-state').textContent='CAMINO DESPEJADO · HALLA AL CABALLERO';}}else updateHud();}
-function doRespawn(){state.dead=false;state.health=100;state.stamina=100;state.flasks=3;hero.root.position.set(state.respawn.x,groundY(state.respawn.x,state.respawn.z),state.respawn.z);hero.root.rotation.y=0;state.yaw=0;$('death-screen').classList.add('hidden');updateHud();showToast('HAS VUELTO A LA BRASA');}
-function beginGame(){state.started=true;$('start-screen').classList.add('hidden');canvas.requestPointerLock?.();showToast('ENCUENTRA EL SANTUARIO AL NORTE');}
+function damageHero(amount){if(state.dodge>0||state.dead)return;state.health=Math.max(0,state.health-amount);hero.hitFlash=.22;state.hurt=.2;$('hurt').classList.add('on');playTone(68,.2,'sawtooth',.07);updateHud();if(state.health<=0){state.dead=true;state.sprinting=false;document.body.classList.remove('playing');$('death-screen').classList.remove('hidden');document.exitPointerLock?.();}}
+function damageEnemy(e,amount){if(!e.alive)return;e.hp=Math.max(0,e.hp-amount);e.hitFlash=.2;playTone(e.isBoss?90:115,.12,'square',.04);if(e.hp<=0){e.alive=false;scene.remove(e.root);state.essence+=e.isBoss?120:35;updateHud();showToast(e.isBoss?'EL CABALLERO HUECO HA CAÍDO':'EL ESPÍRITU SE DISUELVE');if(e.isBoss){state.won=true;state.sprinting=false;document.body.classList.remove('playing');$('victory-screen').classList.remove('hidden');document.exitPointerLock?.();}else if(enemies.filter(x=>!x.isBoss&&x.alive).length===0){$('quest-state').textContent='CAMINO DESPEJADO · HALLA AL CABALLERO';}}else updateHud();}
+function doRespawn(){state.dead=false;state.health=100;state.stamina=100;state.flasks=3;state.hurt=0;$('hurt').classList.remove('on');document.body.classList.add('playing');hero.root.position.set(state.respawn.x,groundY(state.respawn.x,state.respawn.z),state.respawn.z);hero.root.rotation.y=0;state.yaw=0;$('death-screen').classList.add('hidden');updateHud();showToast('HAS VUELTO A LA BRASA');}
+function beginGame(){state.started=true;document.body.classList.add('playing');$('start-screen').classList.add('hidden');canvas.requestPointerLock?.();showToast('ENCUENTRA EL SANTUARIO AL NORTE');}
 
 $('begin-button').addEventListener('click',beginGame);
 $('retry-button').addEventListener('click',doRespawn);
-$('continue-button').addEventListener('click',()=>{$('victory-screen').classList.add('hidden');state.won=false;showToast('LA LLAMA PERDURA. SIGUE EXPLORANDO.');});
+$('continue-button').addEventListener('click',()=>{$('victory-screen').classList.add('hidden');state.won=false;document.body.classList.add('playing');showToast('LA LLAMA PERDURA. SIGUE EXPLORANDO.');});
 $('sound-toggle').addEventListener('click',()=>{soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'♫':'♪';if(soundEnabled){playTone(360,.2,'sine',.04);showToast('EL SONIDO ESTÁ ACTIVADO');}else showToast('EL SONIDO ESTÁ SILENCIADO');});
 document.addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();if(e.repeat)return;if(k===' ')dodge();if(k==='e')interact();if(k==='r')heal();});
 document.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
@@ -146,17 +184,21 @@ function updateHero(dt,time){
  dx+=-Math.sin(state.yaw)*forward+Math.cos(state.yaw)*side;dz+=-Math.cos(state.yaw)*forward-Math.sin(state.yaw)*side;
  const len=Math.hypot(dx,dz);state.moving=len>.01;
  if(len>0){dx/=len;dz/=len;}
+ state.sprinting=state.moving&&isDown('shift')&&state.stamina>2&&state.attack<=0&&state.dodge<=0;
  if(state.dodge>0){state.dodge=Math.max(0,state.dodge-dt);const speed=13;hero.root.position.x+=(-Math.sin(state.yaw))*speed*dt;hero.root.position.z+=(-Math.cos(state.yaw))*speed*dt;}
- else if(state.moving){const speed=state.attack>0?2.45:5.5;hero.root.position.x+=dx*speed*dt;hero.root.position.z+=dz*speed*dt;}
+ else if(state.moving){const speed=state.attack>0?2.45:state.sprinting?8.2:5.5;hero.root.position.x+=dx*speed*dt;hero.root.position.z+=dz*speed*dt;}
  hero.root.position.x=clamp(hero.root.position.x,-100,100);hero.root.position.z=clamp(hero.root.position.z,-101,100);
  hero.root.position.y=groundY(hero.root.position.x,hero.root.position.z);hero.root.rotation.y=state.yaw;
- hero.walk+=dt*(state.moving?9:2);
- hero.legL.rotation.x=state.moving?Math.sin(hero.walk)*.55:0;hero.legR.rotation.x=state.moving?-Math.sin(hero.walk)*.55:0;
- hero.torso.position.y=state.moving?Math.abs(Math.sin(hero.walk))*-.055:0;
+ hero.walk+=dt*(state.moving?(state.sprinting?13:9):2);
+ const gait=state.sprinting ? 0.72 : 0.55;
+ hero.legL.rotation.x=state.moving?Math.sin(hero.walk)*gait:0;hero.legR.rotation.x=state.moving?-Math.sin(hero.walk)*gait:0;
+ hero.torso.position.y=state.moving?Math.abs(Math.sin(hero.walk))*(state.sprinting?-.085:-.055):0;
+ hero.torso.rotation.z=state.sprinting?Math.sin(hero.walk)*.035:0;
  if(state.attack>0){state.attack=Math.max(0,state.attack-dt);const t=1-state.attack/.48;hero.armR.rotation.x=-1.65*Math.sin(Math.min(1,t)*Math.PI);hero.armR.rotation.z=-.8*Math.sin(Math.min(1,t)*Math.PI);if(t>.28&&!state.attackHit){state.attackHit=true;const fwd=new THREE.Vector3(-Math.sin(state.yaw),0,-Math.cos(state.yaw));for(const e of enemies){if(!e.alive)continue;const delta=e.root.position.clone().sub(hero.root.position);const d=delta.length();delta.y=0;delta.normalize();if(d<(e.isBoss?4.7:3.4)&&fwd.dot(delta)>.05)damageEnemy(e,e.isBoss?72:62);}}if(state.attack===0){hero.armR.rotation.set(0,0,0);}}
  else hero.armR.rotation.z=0;
  if(state.heal>0){state.heal-=dt;hero.root.scale.setScalar(1+Math.sin(time*28)*.025);}else hero.root.scale.setScalar(1);
- state.stamina=Math.min(100,state.stamina+dt*(state.attack>0||state.dodge>0?4:18));
+ if(state.sprinting)state.stamina=Math.max(0,state.stamina-dt*24);
+ else state.stamina=Math.min(100,state.stamina+dt*(state.attack>0||state.dodge>0?4:16));
  const dShrine=hero.root.position.distanceTo(shrine.position);$('interact-prompt').classList.toggle('show',dShrine<5.2);
  const boss=enemies.find(e=>e.isBoss);state.bossNear=!!boss?.alive&&boss.root.position.distanceTo(hero.root.position)<25;$('boss-bar').classList.toggle('show',state.bossNear);
  const z=hero.root.position.z;const region=z < -50?'EL SANTUARIO CAÍDO':z < -25?'LAS TUMBAS HUNDIDAS':'LAS TIERRAS DE LA CENIZA';$('region-name').textContent=region;$('compass-label').textContent=z > -55?'— EL SANTUARIO —':'— EL UMBRAL —';
@@ -181,6 +223,7 @@ function updateCamera(dt){
 function frame(){requestAnimationFrame(frame);const dt=Math.min(clock.getDelta(),.045),time=clock.elapsedTime;
  updateHero(dt,time);updateEnemies(dt,time);updateCamera(dt);
  if(state.toastTimer>0){state.toastTimer-=dt*1000;if(state.toastTimer<=0)$('toast').classList.remove('show');}
+ if(state.hurt>0){state.hurt=Math.max(0,state.hurt-dt);if(state.hurt===0)$('hurt').classList.remove('on');}
  for(const m of motes){m.position.y=m.userData.homeY+Math.sin(time*m.userData.speed+m.userData.phase)*.32;m.position.x+=Math.sin(time*.4+m.userData.phase)*dt*.12;}
  if(shrine.userData.flame){shrine.userData.flame.intensity=(state.shrine?4.8:2.7)+Math.sin(time*8)*.45;}
  renderer.render(scene,camera);
